@@ -16,9 +16,11 @@
       in with pkgs; rec {
         devShell = mkShell rec {
           packages = [
+            pkgs.speechd
           ];
           buildInputs = [
             pkgs.libclang
+            pkgs.speechd
           ];
           nativeBuildInputs = [
           ];

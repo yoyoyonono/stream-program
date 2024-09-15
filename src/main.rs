@@ -1,3 +1,8 @@
+use natural_tts::{models::gtts::GttsModel, NaturalTtsBuilder};
 fn main() {
-    println!("Hello, world!");
+    let mut natural = NaturalTtsBuilder::default()
+        .gtts_model(GttsModel::default())
+        .default_model(Model::GttsModel)
+        .build()
+        .unwarp();
 }
