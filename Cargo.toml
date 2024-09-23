@@ -4,4 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-natural-tts = "0.1.5"
+queues = "1.1.0"
+tokio = {version = "1.40.0", features = ["full"]}
+tts = "0.26.3"
+youtube_chat = "0.2.1"
