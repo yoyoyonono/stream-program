@@ -2,14 +2,10 @@ use std::sync::{Arc, Mutex};
 use std::{thread, time::Duration};
 use queues::*;
 use tokio::{task, time};
-
-use chrono;
 use tts::Tts;
-use twitch_irc::login::StaticLoginCredentials;
-use twitch_irc::message::ServerMessage;
-use youtube_chat::live_chat::LiveChatClientBuilder;
-
-use twitch_irc::{SecureTCPTransport, TwitchIRCClient};
+use brainrot::{twitch, youtube};
+use futures_util::StreamExt;
+use chrono;
 
 #[derive(Debug, Clone)]
 struct ChatMessage {
@@ -20,6 +16,7 @@ struct ChatMessage {
 #[tokio::main]
 async fn main() {
     let yt_channel_id = "UCl8NSZ2GyhoQlAnZmW4cpBw";
+    let twitch_id = "yoyoyonono";
     
     let mut tts_voice = Tts::new(tts::Backends::WinRt).unwrap();
     tts_voice.speak("hello, world", false).unwrap();
@@ -30,50 +27,42 @@ async fn main() {
     let tts_queue_yt = Arc::clone(&tts_queue_arc);
     let tts_queue_twitch = Arc::clone(&tts_queue_arc);
 
-    let mut yt_client = LiveChatClientBuilder::new()
-        .channel_id(yt_channel_id.to_string())
-        .on_chat(move |chat_item| {
-            if chat_item.message.len() > 1 {
-                return;
-            }
-            for item in chat_item.message {
-                match item {
-                    youtube_chat::item::MessageItem::Text(text) => {
-                        let name = chat_item.author.name.to_owned().unwrap();
-                        println!("{} | {}: {}", chat_item.timestamp.unwrap().format("%Y/%m/%d %H:%M"), name, text);
-                        tts_queue_yt.lock().unwrap().add(ChatMessage{author: name, text: text}).unwrap();
-                    },
-                    _ => {}
-                } 
-            }
-        })
-        .build();
+    let program_start_time = chrono::Utc::now();
 
-
-    let twitch_chat_config = twitch_irc::ClientConfig::default();
-    let (mut twitch_incoming_messages, twitch_client) = TwitchIRCClient::<SecureTCPTransport, StaticLoginCredentials>::new(twitch_chat_config);
-
-    let handle_twitch_chat = tokio::spawn(async move {
-        while let Some(message) = twitch_incoming_messages.recv().await {
-            match message {
-                ServerMessage::Privmsg(privmsg) => {
-                    println!("{}: {}", privmsg.sender.name, privmsg.message_text);
-                    tts_queue_twitch.lock().unwrap().add(ChatMessage{author: privmsg.sender.name, text: privmsg.message_text}).unwrap();
+    let yt_handler = tokio::spawn(async move {
+        let context = youtube::ChatContext::new_from_channel(yt_channel_id, youtube::ChannelSearchOptions::LatestLiveOrUpcoming).await.unwrap();
+        let mut stream = youtube::stream(&context).await.unwrap();
+        while let Some(Ok(c)) = stream.next().await {
+            if let youtube::Action::AddChatItem { item: youtube::ChatItem::TextMessage {message_renderer_base, message}, .. } = c {
+                if message_renderer_base.timestamp_usec < program_start_time {
+                    continue;
                 }
-                _ => {}
+                let text = ChatMessage {
+                    author: message_renderer_base.author_name.unwrap().simple_text,
+                    text: message.unwrap().runs.into_iter().map(|c| c.to_chat_string()).collect::<String>()
+                };
+                let mut lock = tts_queue_yt.lock().unwrap();
+                lock.add(text).unwrap();
+                drop(lock);
             }
         }
     });
 
-    twitch_client.join("yoyoyonono".to_owned()).unwrap();
+    let twitch_handler = tokio::spawn(async move {
+        let mut client = brainrot::TwitchChat::new(twitch_id, twitch::Anonymous).await.unwrap();
 
-    let is_youtube_live = yt_client.start().await;
-    match &is_youtube_live {
-        Err(e) => {
-            tts_voice.speak("youtube chat not available", false).unwrap();
-        }, 
-        _ => {}
-    }
+        while let Some(message) = client.next().await.transpose().unwrap() {
+            if let brainrot::TwitchChatEvent::Message {user, contents, ..} = message {
+                let text = ChatMessage {
+                    author: user.display_name,
+                    text: contents.iter().map(|c| c.to_string()).collect::<String>()
+                };
+                let mut lock = tts_queue_twitch.lock().unwrap();
+                lock.add(text).unwrap();
+                drop(lock);
+            }
+        }
+    });
 
     thread::spawn(move || {
         loop {
@@ -88,21 +77,8 @@ async fn main() {
         }
     });
 
-    match is_youtube_live {
-        Ok(_) => {
-            let yt_chat_queue = task::spawn(async move {
-                let mut interval = time::interval(Duration::from_millis(100));
-                loop {
-                    interval.tick().await;
-                    yt_client.execute().await;
-                }
-            });
-            yt_chat_queue.await.unwrap();
-        },
-        _ => {}
-    }
-
-    handle_twitch_chat.await.unwrap();
+    yt_handler.await.unwrap();
+    twitch_handler.await.unwrap();
 
 }
 
