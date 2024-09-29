@@ -6,11 +6,46 @@ use tts::Tts;
 use brainrot::{twitch, youtube};
 use futures_util::StreamExt;
 use chrono;
+use iced;
+use iced::widget;
 
 #[derive(Debug, Clone)]
 struct ChatMessage {
     author: String,
     text: String
+}
+
+#[derive(Default)]
+struct AppState {
+    value: i32,
+}
+
+impl AppState {
+    fn update(&mut self, message: AppMessage) {
+        match message {
+            AppMessage::Increment => {
+                self.value += 1;
+            }
+            AppMessage::Decrement => {
+                self.value -= 1;
+            }
+        }        
+    }
+
+    fn view(&self) -> widget::Column<AppMessage> {
+        widget::column![
+            widget::button("Increment").on_press(AppMessage::Increment),
+            widget::text(self.value).size(50),
+            widget::button("Decrement").on_press(AppMessage::Decrement)
+        ].padding(20)
+        .align_x(iced::Center)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum AppMessage {
+    Increment,
+    Decrement
 }
 
 #[tokio::main]
@@ -79,6 +114,7 @@ async fn main() {
 
     yt_handler.await.unwrap();
     twitch_handler.await.unwrap();
+    iced::run("A cool counter", AppState::update, AppState::view);
 
 }
 
