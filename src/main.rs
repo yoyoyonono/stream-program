@@ -65,26 +65,30 @@ async fn main() {
     let program_start_time = chrono::Utc::now();
 
     let yt_handler = tokio::spawn(async move {
-        let context = youtube::ChatContext::new_from_channel(yt_channel_id, youtube::ChannelSearchOptions::LatestLiveOrUpcoming).await.unwrap();
-        let mut stream = youtube::stream(&context).await.unwrap();
-        while let Some(Ok(c)) = stream.next().await {
-            if let youtube::Action::AddChatItem { item: youtube::ChatItem::TextMessage {message_renderer_base, message}, .. } = c {
-                if message_renderer_base.timestamp_usec < program_start_time {
-                    continue;
+        if let Result::Ok(context) = youtube::ChatContext::new_from_channel(yt_channel_id, youtube::ChannelSearchOptions::LatestLiveOrUpcoming).await {
+            let mut stream = youtube::stream(&context).await.unwrap();
+            println!("Youtube connected");
+            while let Some(Ok(c)) = stream.next().await {
+                if let youtube::Action::AddChatItem { item: youtube::ChatItem::TextMessage {message_renderer_base, message}, .. } = c {
+                    if message_renderer_base.timestamp_usec < program_start_time {
+                        continue;
+                    }
+                    let text = ChatMessage {
+                        author: message_renderer_base.author_name.unwrap().simple_text,
+                        text: message.unwrap().runs.into_iter().map(|c| c.to_chat_string()).collect::<String>()
+                    };
+                    let mut lock = tts_queue_yt.lock().unwrap();
+                    lock.add(text).unwrap();
+                    drop(lock);
                 }
-                let text = ChatMessage {
-                    author: message_renderer_base.author_name.unwrap().simple_text,
-                    text: message.unwrap().runs.into_iter().map(|c| c.to_chat_string()).collect::<String>()
-                };
-                let mut lock = tts_queue_yt.lock().unwrap();
-                lock.add(text).unwrap();
-                drop(lock);
             }
-        }
+        };
     });
 
     let twitch_handler = tokio::spawn(async move {
         let mut client = brainrot::TwitchChat::new(twitch_id, twitch::Anonymous).await.unwrap();
+
+        println!("Twitch connected");
 
         while let Some(message) = client.next().await.transpose().unwrap() {
             if let brainrot::TwitchChatEvent::Message {user, contents, ..} = message {
@@ -98,6 +102,7 @@ async fn main() {
             }
         }
     });
+
 
     thread::spawn(move || {
         loop {
