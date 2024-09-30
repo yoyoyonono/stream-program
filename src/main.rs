@@ -136,8 +136,8 @@ async fn main() {
         drop(lock);
         thread::sleep(Duration::from_millis(100));
     });
-
+    
+    iced::run("A cool counter", AppState::update, AppState::view);
     yt_handler.await.unwrap();
     twitch_handler.await.unwrap();
-    iced::run("A cool counter", AppState::update, AppState::view);
 }
