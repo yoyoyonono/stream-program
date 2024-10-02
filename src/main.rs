@@ -51,7 +51,7 @@ enum AppMessage {
 
 #[tokio::main]
 async fn main() {
-    let yt_channel_id = "UCl8NSZ2GyhoQlAnZmW4cpBw";
+    let yt_live_id = "7WBJlWc9NX4";
     let twitch_id = "yoyoyonono";
 
     let mut tts_voice = Tts::new(tts::Backends::WinRt).unwrap();
@@ -66,42 +66,36 @@ async fn main() {
     let program_start_time = chrono::Utc::now();
 
     let yt_handler = tokio::spawn(async move {
-        if let Result::Ok(context) = youtube::ChatContext::new_from_channel(
-            yt_channel_id,
-            youtube::ChannelSearchOptions::LatestLiveOrUpcoming,
-        )
-        .await
-        {
-            let mut stream = youtube::stream(&context).await.unwrap();
-            println!("Youtube connected");
-            while let Some(Ok(c)) = stream.next().await {
-                if let youtube::Action::AddChatItem {
-                    item:
-                        youtube::ChatItem::TextMessage {
-                            message_renderer_base,
-                            message,
-                        },
-                    ..
-                } = c
-                {
-                    if message_renderer_base.timestamp_usec < program_start_time {
-                        continue;
-                    }
-                    let text = ChatMessage {
-                        author: message_renderer_base.author_name.unwrap().simple_text,
-                        text: message
-                            .unwrap()
-                            .runs
-                            .into_iter()
-                            .map(|c| c.to_chat_string())
-                            .collect::<String>(),
-                    };
-                    let mut lock = tts_queue_yt.lock().unwrap();
-                    lock.add(text).unwrap();
-                    drop(lock);
+        let context = youtube::ChatContext::new_from_live(yt_live_id).await.unwrap();
+        let mut stream = youtube::stream(&context).await.unwrap();
+        println!("Youtube connected");
+        while let Some(Ok(c)) = stream.next().await {
+            if let youtube::Action::AddChatItem {
+                item:
+                    youtube::ChatItem::TextMessage {
+                        message_renderer_base,
+                        message,
+                    },
+                ..
+            } = c
+            {
+                if message_renderer_base.timestamp_usec < program_start_time {
+                    continue;
                 }
+                let text = ChatMessage {
+                    author: message_renderer_base.author_name.unwrap().simple_text,
+                    text: message
+                        .unwrap()
+                        .runs
+                        .into_iter()
+                        .map(|c| c.to_chat_string())
+                        .collect::<String>(),
+                };
+                let mut lock = tts_queue_yt.lock().unwrap();
+                lock.add(text).unwrap();
+                drop(lock);
             }
-        };
+        }
     });
 
     let twitch_handler = tokio::spawn(async move {
@@ -136,7 +130,7 @@ async fn main() {
         drop(lock);
         thread::sleep(Duration::from_millis(100));
     });
-    
+
     iced::run("A cool counter", AppState::update, AppState::view);
     yt_handler.await.unwrap();
     twitch_handler.await.unwrap();
