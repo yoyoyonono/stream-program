@@ -6,6 +6,8 @@ edition = "2021"
 [dependencies]
 brainrot = "0.1.0"
 chrono = "0.4.38"
+eframe = "0.29.1"
+egui = "0.29.1"
 futures-util = "0.3.30"
 iced = "0.13.1"
 queues = "1.1.0"
