@@ -11,5 +11,6 @@ egui = "0.29.1"
 futures-util = "0.3.30"
 iced = "0.13.1"
 queues = "1.1.0"
+rand = "0.9.1"
 tokio = {version = "1.40.0", features = ["full"]}
 tts = "0.26.3"
