@@ -182,7 +182,7 @@ impl eframe::App for AppState {
                     let mut danmaku_lock = self.danmaku_queue.lock().unwrap();
                     while let Ok(message) = danmaku_lock.remove() {
                         let mut y_pos = 0;
-                        while self.current_danmaku.iter().any(|d| (d.position[1] == y_pos as f32 && d.position[0] + d.width + 50.0 > 1920.0)) {
+                        while self.current_danmaku.iter().any(|d| (d.position[1] == y_pos as f32 && d.position[0] + d.width + 20.0 > 1920.0)) {
                             y_pos += 30;
                         }
 
