@@ -18,7 +18,7 @@ struct ChatMessage {
 
 #[tokio::main]
 async fn main() {
-    let yt_live_id = "7WBJlWc9NX4";
+    let yt_live_id = "gf_MQ4-JhBk";
     let twitch_id = "yoyoyonono";
 
     let options = eframe::NativeOptions {
@@ -48,7 +48,7 @@ async fn main() {
 
     let program_start_time = chrono::Utc::now();
 
-    let yt_handler = tokio::spawn(async move {
+    /*let yt_handler = tokio::spawn(async move {
         let context = youtube::ChatContext::new_from_live(yt_live_id)
             .await
             .unwrap();
@@ -87,7 +87,7 @@ async fn main() {
                 drop(danmaku_lock);
             }
         }
-    });
+    });*/
 
     let twitch_handler = tokio::spawn(async move {
         let mut client = brainrot::TwitchChat::new(twitch_id, twitch::Anonymous)
@@ -140,7 +140,7 @@ async fn main() {
     )
     .unwrap();
 
-    yt_handler.await.unwrap();
+    // yt_handler.await.unwrap();
     twitch_handler.await.unwrap();
 }
 
